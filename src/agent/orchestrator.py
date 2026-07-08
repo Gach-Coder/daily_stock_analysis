@@ -281,14 +281,19 @@ class AgentOrchestrator:
         timeout_seconds: Optional[float] = None,
     ) -> StageResult:
         """Run a stage agent while preserving compatibility with older call signatures."""
-        # Clamp by per-agent limit when configured
+        # Clamp by per-agent limit when configured.
+        # When pipeline budget is disabled (timeout_seconds is None),
+        # the sub-agent's own limit still applies as a standalone cap.
         sub_agent_timeout_map = self._get_sub_agent_timeout_map()
-        if timeout_seconds is not None and sub_agent_timeout_map:
+        if sub_agent_timeout_map:
             agent_limit = sub_agent_timeout_map.get(agent.agent_name)
             if agent_limit is None and agent.agent_name in getattr(self, "_skill_agent_names", set()):
                 agent_limit = sub_agent_timeout_map.get("skill")
             if agent_limit is not None:
-                timeout_seconds = min(timeout_seconds, agent_limit)
+                if timeout_seconds is not None:
+                    timeout_seconds = min(timeout_seconds, agent_limit)
+                else:
+                    timeout_seconds = agent_limit
         run_kwargs = {"progress_callback": progress_callback}
         if (
             timeout_seconds is not None
